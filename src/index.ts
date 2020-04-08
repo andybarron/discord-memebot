@@ -22,7 +22,7 @@ async function main() {
     logger.info(message.content)
     const { content } = message
     const prefix = '!meme'
-    if (content.split(/\s+/)[0] === prefix) {
+    if (!message.author.bot && content.split(/\s+/)[0] === prefix) {
       const argText = content.substring(prefix.length).replace(/^\s+/, '')
       const args = argText.split(/(?:[^\\])\|/).map((arg) => arg.trim())
       logger.info({ args })
