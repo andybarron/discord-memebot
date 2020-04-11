@@ -1,7 +1,7 @@
 import Discord from 'discord.js'
 import { ImgflipClient } from './ImgflipClient'
 import { logger } from './logger'
-import { MemeManager } from './MemeManager'
+import { MemeManager, ListTemplatesResult } from './MemeManager'
 import {
   IMGFLIP_API_PASSWORD,
   IMGFLIP_API_USERNAME,
@@ -54,7 +54,7 @@ async function main() {
         await message.channel.send([
           `**Search:** \`${search}\``, // TODO: escape backticks
           '**Template results**',
-          ...templates.map((template) => template.name),
+          ...formatListResult(templates),
         ])
       } else if (command === '!memelist') {
         if (args.length) {
@@ -65,7 +65,7 @@ async function main() {
         })
         await message.channel.send([
           `**Top ${templates.length} templates**`,
-          ...templates.map((template) => template.name),
+          ...formatListResult(templates),
         ])
       }
     } catch (err) {
@@ -93,6 +93,10 @@ async function main() {
   })
 
   client.login(DISCORD_BOT_TOKEN)
+}
+
+function formatListResult(templates: ListTemplatesResult['templates']) {
+  return templates.map((template) => `• ${template.name}`)
 }
 
 class InvalidArgsError extends Error {}
