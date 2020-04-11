@@ -35,7 +35,10 @@ export class ImgflipClient {
   }: CreateMemeParams): Promise<string> {
     const params = {
       template_id: templateId,
-      boxes: captions.map((text) => ({ text })),
+      // TODO: just return the template blank default URL
+      boxes: captions.length
+        ? captions.map((text) => ({ text }))
+        : [{ text: ' ' }],
       username: this.username,
       password: this.password,
     }
@@ -61,6 +64,7 @@ const GetMemesResponseSchema = t.Record({
       t.Record({
         id: t.String,
         name: t.String,
+        url: t.String,
       }),
     ),
   }),
