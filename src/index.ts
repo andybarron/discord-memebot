@@ -37,6 +37,7 @@ async function main() {
   // await client.listCommands()
 
   // Register slash commands
+  // TODO: fetch first, only re-register if there's a diff?
   await client.registerCommand({
     name: 'mbt',
     description: 'Create a meme or find a template',
@@ -80,7 +81,6 @@ async function main() {
     await respond({
       type: InteractionResponseType.AcknowledgeWithSource,
     })
-    console.log(interaction)
     const command = interaction.data?.options?.[0]
     assert(command)
     // TODO: display box counts
