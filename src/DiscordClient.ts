@@ -29,7 +29,7 @@ export class DiscordClient extends Discord.Client {
   private readonly _devMode: DiscordClientOptions['devMode']
   constructor({ devMode, discordJsOptions }: DiscordClientOptions) {
     super(discordJsOptions)
-    this._devMode = Object.assign({}, devMode)
+    this._devMode = devMode && { ...devMode }
     // auto-ack pings
     this.onInteraction(async (interaction, respond) => {
       if (interaction.type === InteractionType.Ping) {
