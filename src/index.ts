@@ -27,6 +27,10 @@ async function main() {
       : null,
   })
 
+  client.on('ready', () => {
+    logger.debug('discord client ready')
+  })
+
   await client.login(DISCORD_BOT_TOKEN)
 
   // TODO: Delete old unused slash commands
