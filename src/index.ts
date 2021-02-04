@@ -1,104 +1,184 @@
-import Discord from 'discord.js'
+import { strict as assert } from 'assert'
+import {
+  DiscordClient,
+  InteractionResponseType,
+  OptionType,
+} from './DiscordClient'
 import { ImgflipClient } from './ImgflipClient'
 import { logger } from './logger'
-import { MemeManager, ListTemplatesResult } from './MemeManager'
+import { MemeManager } from './MemeManager'
 import {
   IMGFLIP_API_PASSWORD,
   IMGFLIP_API_USERNAME,
   DISCORD_BOT_TOKEN,
+  DISCORD_TEST_GUILD_ID,
+  DEV_MODE,
 } from './config'
-import { splitOnValue } from './arrayUtils'
 
 async function main() {
   const manager = new MemeManager(
     new ImgflipClient(IMGFLIP_API_USERNAME, IMGFLIP_API_PASSWORD),
   )
-  const client = new Discord.Client()
+  const client = new DiscordClient({
+    devMode: DEV_MODE
+      ? {
+          testGuildId: DISCORD_TEST_GUILD_ID,
+        }
+      : null,
+  })
 
   client.on('ready', () => {
     logger.debug('discord client ready')
   })
 
-  client.on('message', async (message) => {
-    try {
-      if (message.author.bot) {
-        return
-      }
+  await client.login(DISCORD_BOT_TOKEN)
 
-      const { content } = message
-      if (content.length > 2_000) {
-        return
-      }
-      const words = content.split(/\s+/).filter((word) => word)
-      const [command, ...args] = words
+  // TODO: Delete old unused slash commands
+  // await client.listCommands()
 
-      if (command === '!meme') {
-        // TODO: preserve whitespace?
-        const memeArgs = splitOnValue('|', args).map((chunk) => chunk.join(' '))
-        const valid = memeArgs.length && memeArgs[0].length
-        if (!valid) {
-          throw new InvalidArgsError()
-        }
-        const [name, ...captions] = memeArgs
-        const result = await manager.createMeme({ name, captions })
-        await message.channel.send(undefined, { files: [result.imageUrl] })
-      } else if (command === '!memesearch') {
-        if (!args.length) {
-          throw new InvalidArgsError()
-        }
-        const search = args.join(' ')
+  // Register slash commands
+  await client.registerCommand({
+    name: 'mbt',
+    description: 'Create a meme or find a template',
+    options: [
+      {
+        type: OptionType.SubCommand,
+        name: 'create',
+        description: 'Create a new meme',
+        options: [
+          {
+            type: OptionType.String,
+            name: 'input',
+            description: 'template | line 1 | line 2 | etc',
+            required: true,
+          },
+        ],
+      },
+      {
+        type: OptionType.SubCommand,
+        name: 'list',
+        description: 'List top meme templates',
+      },
+      {
+        type: OptionType.SubCommand,
+        name: 'search',
+        description: 'Search available meme templates',
+        options: [
+          {
+            type: OptionType.String,
+            name: 'query',
+            description: 'Meme template text to search for',
+            required: true,
+          },
+        ],
+      },
+    ],
+  })
+
+  // Respond to interactions
+  client.onInteraction(async (interaction, respond, send) => {
+    await respond({
+      type: InteractionResponseType.AcknowledgeWithSource,
+    })
+    console.log(interaction)
+    const command = interaction.data?.options?.[0]
+    assert(command)
+    // TODO: display box counts
+    switch (command.name) {
+      case 'list': {
+        const { templates } = await manager.listTemplates({
+          limit: 20,
+        })
+        const content = [
+          `**Top ${templates.length} templates**`,
+          ...formatListResult(templates),
+        ].join('\n')
+        await send({ content })
+        break
+      }
+      case 'search': {
+        const search = command.options?.find(
+          (option) => option.name === 'query',
+        )?.value
+        assert(search)
         const { templates } = await manager.listTemplates({
           search,
           limit: 10,
         })
-        await message.channel.send([
+        const content = [
           `**Search:** \`${search}\``, // TODO: escape backticks
           '**Template results**',
           ...formatListResult(templates),
-        ])
-      } else if (command === '!memelist') {
-        if (args.length) {
-          throw new InvalidArgsError()
-        }
-        const { templates } = await manager.listTemplates({
-          limit: 20,
-        })
-        await message.channel.send([
-          `**Top ${templates.length} templates**`,
-          ...formatListResult(templates),
-        ])
+        ].join('\n')
+        await send({ content })
+        break
       }
-    } catch (err) {
-      if (err instanceof InvalidArgsError) {
-        message.channel.send([
-          '**Commands**',
-          '• `!memelist`',
-          '• `!memesearch [search terms]`',
-          '• `!meme [template name]`',
-          '• `!meme [template name] | [caption 1]`',
-          '• `!meme [template name] | [caption 1] | [caption 2] | ...`',
-          '',
-          '**Examples**',
-          '• `!memesearch surprised pikachu`',
-          '• `!meme two buttons | make memes | do literally anything else`',
-          '• `!meme pigeon | me | writing discord bots | is this a hobby?`',
-        ])
-      } else {
-        logger.error(
-          { err, messageContent: message.content },
-          'Error handling message',
-        )
+      case 'create': {
+        const input = command.options?.find((option) => option.name === 'input')
+          ?.value
+        assert(typeof input === 'string')
+
+        const parts = input.split('|').map((part) => part.trim())
+
+        const [template, ...captions] = parts
+
+        if (!template) {
+          await send({
+            content: 'Please specify a meme template :speak_no_evil:',
+          })
+          break
+        }
+
+        const result = await manager.createMeme({
+          name: template,
+          captions,
+        })
+
+        await send({
+          embeds: [
+            {
+              image: {
+                url: result.imageUrl,
+              },
+              type: 'image',
+            },
+          ],
+        })
+        break
+      }
+      default: {
+        await send({ content: 'Something went wrong :sob:' })
+        break
       }
     }
   })
 
-  client.login(DISCORD_BOT_TOKEN)
+  // respond to legacy calls
+  client.on('message', async (message) => {
+    if (message.author.bot) {
+      return
+    }
+
+    const shouldReply = message.content.toLowerCase().trim().startsWith('!meme')
+
+    if (!shouldReply) {
+      return
+    }
+
+    await message.channel.send([
+      "I've leveled up! Type `/mbt` to see my new command list :blush:",
+    ])
+  })
+
+  logger.debug('App started')
 }
 
-function formatListResult(templates: ListTemplatesResult['templates']) {
+function formatListResult(templates: { name: string }[]): string[] {
   return templates.map((template) => `• ${template.name}`)
 }
 
-class InvalidArgsError extends Error {}
-
-main().catch((err) => logger.error({ err }))
+main().catch(async (err) => {
+  logger.error({ err }, 'App error in main()')
+  await new Promise((resolve) => setTimeout(resolve, 5_000))
+  process.exit(-1)
+})

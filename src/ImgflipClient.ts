@@ -29,6 +29,7 @@ export class ImgflipClient {
     })
     return response.data.memes
   }
+  // TODO: validate number of boxes
   async createMeme({
     templateId,
     captions,

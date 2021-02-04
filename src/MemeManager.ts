@@ -1,10 +1,8 @@
 import leven from 'fast-levenshtein'
 import stringify from 'json-stable-stringify'
-import minBy from 'lodash/minBy'
 import sortBy from 'lodash/sortBy'
 import Lru from 'lru-cache'
 import { ImgflipClient } from './ImgflipClient'
-import { logger } from './logger'
 
 export class MemeManager {
   private readonly _createMemeCache = new Lru<string, CreateMemeResult>({
