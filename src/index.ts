@@ -38,61 +38,33 @@ async function main() {
     description: 'Create a meme or find a template',
     options: [
       {
-        type: OptionType.SubCommandGroup,
-        name: 'meme',
-        description: 'Memes',
+        type: OptionType.SubCommand,
+        name: 'create',
+        description: 'Create a new meme',
         options: [
           {
-            type: OptionType.SubCommand,
-            name: 'create',
-            description: 'Create a new meme',
-            options: [
-              {
-                type: OptionType.String,
-                name: 'template',
-                description: 'Template name (or part of it)',
-              },
-              {
-                type: OptionType.String,
-                name: 'text1',
-                description: 'First text box/line',
-              },
-              {
-                type: OptionType.String,
-                name: 'text2',
-                description: 'Second text box/line',
-              },
-              {
-                type: OptionType.String,
-                name: 'text3',
-                description: 'Third text box/line',
-              },
-            ],
+            type: OptionType.String,
+            name: 'input',
+            description: 'template | line 1 | line 2 | etc',
+            required: true,
           },
         ],
       },
       {
-        type: OptionType.SubCommandGroup,
-        name: 'template',
-        description: 'Templates',
+        type: OptionType.SubCommand,
+        name: 'list',
+        description: 'List top meme templates',
+      },
+      {
+        type: OptionType.SubCommand,
+        name: 'search',
+        description: 'Search available meme templates',
         options: [
           {
-            type: OptionType.SubCommand,
-            name: 'list',
-            description: 'List top meme templates',
-          },
-          {
-            type: OptionType.SubCommand,
-            name: 'search',
-            description: 'Search available meme templates',
-            options: [
-              {
-                type: OptionType.String,
-                name: 'query',
-                description: 'Meme template text to search for',
-                required: true,
-              },
-            ],
+            type: OptionType.String,
+            name: 'query',
+            description: 'Meme template text to search for',
+            required: true,
           },
         ],
       },
@@ -104,14 +76,12 @@ async function main() {
     await respond({
       type: InteractionResponseType.AcknowledgeWithSource,
     })
-    const group = interaction.data?.options?.[0]
-    assert(group)
-    const command = group.options?.[0]
+    console.log(interaction)
+    const command = interaction.data?.options?.[0]
     assert(command)
-    const fullCommand = `${group.name} ${command.name}`
     // TODO: display box counts
-    switch (fullCommand) {
-      case 'template list': {
+    switch (command.name) {
+      case 'list': {
         const { templates } = await manager.listTemplates({
           limit: 20,
         })
@@ -122,7 +92,7 @@ async function main() {
         await send({ content })
         break
       }
-      case 'template search': {
+      case 'search': {
         const search = command.options?.find(
           (option) => option.name === 'query',
         )?.value
@@ -139,18 +109,20 @@ async function main() {
         await send({ content })
         break
       }
-      case 'meme create': {
-        const template = command.options?.find(
-          (option) => option.name === 'template',
-        )?.value
-        assert(template)
+      case 'create': {
+        const input = command.options?.find((option) => option.name === 'input')
+          ?.value
+        assert(typeof input === 'string')
 
-        const captions: string[] = []
-        for (const name of ['text1', 'text2', 'text3'] as const) {
-          const line = command.options?.find((option) => option.name === name)
-          if (line?.value) {
-            captions.push(line.value)
-          }
+        const parts = input.split('|').map((part) => part.trim())
+
+        const [template, ...captions] = parts
+
+        if (!template) {
+          await send({
+            content: 'Please specify a meme template :speak_no_evil:',
+          })
+          break
         }
 
         const result = await manager.createMeme({
@@ -190,7 +162,7 @@ async function main() {
     }
 
     await message.channel.send([
-      "_I've leveled up! Type `/mbt` to see my new command list :blush:_",
+      "I've leveled up! Type `/mbt` to see my new command list :blush:",
     ])
   })
 
